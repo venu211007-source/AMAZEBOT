@@ -1,0 +1,47 @@
+==========================================
+  AMAZEBOT — SAMPLE QUERIES CHEAT SHEET
+  A Teenager Innovation
+==========================================
+
+Upload any document first, then try these:
+
+--- TEXT ANALYSIS ---
+Summarize the key findings in this document
+What are the most important points in this document?
+List the pros and cons mentioned
+What are the main topics covered?
+Give me a detailed explanation of [topic]
+
+--- CHARTS & GRAPHS ---
+Compare the main data points as a bar chart
+Show me a pie chart of the topics covered
+Plot the numerical values as a line graph
+Create a chart comparing all materials and their properties
+Visualize the key statistics as a doughnut chart
+
+--- COMPARISONS ---
+Compare the main concepts in a table
+Show a side by side comparison of all the items mentioned
+Create a comparison table of the advantages and disadvantages
+
+--- IMAGE GENERATION ---
+Generate an image based on the main theme of this document
+Draw an illustration of the key concepts
+Paint a colourful picture representing this document
+Illustrate the process described in this document
+Create an artistic image inspired by the content
+
+--- FOR HYDROGEN STORAGE DOCUMENT ---
+Compare hydrogen storage capacity of different alloys as a bar chart
+Show activation energies of MgH2 catalysts as a graph
+Plot the desorption temperatures of different hydride materials
+Generate an image of a hydrogen storage research laboratory
+Illustrate the MgH2 catalysis process
+
+==========================================
+TIPS:
+- Set dropdown to CHART to always get a graph
+- Set dropdown to AUTO to let AMAZEBOT decide
+- Say "draw", "paint", "generate image" for images
+- Say "compare" or "table" for comparison tables
+==========================================
