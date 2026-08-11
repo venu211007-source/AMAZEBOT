@@ -1,0 +1,12 @@
+# Python virtual environment — huge, not source code, install via requirements.txt
+backend/venv/
+__pycache__/
+*.pyc
+
+# Real voice recordings used for cloning — personal audio data, not code.
+# Anyone running this locally uploads their own via the app's UI.
+backend/voices/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+httpx
+faster-whisper
+python-multipart
+
+# Voice cloning (tts_server.py) — torch must match your GPU's CUDA version,
+# see https://pytorch.org/get-started/locally/ for the right install command.
+# numpy is pinned indirectly by TTS's own dependency resolution.
+torch
+TTS
