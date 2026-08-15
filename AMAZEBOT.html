@@ -5643,26 +5643,55 @@ function answerMatch(shuffledRight) {
   if (nxt) nxt.style.display = 'inline-block';
 }
 
+// Tokenizes to lowercase words (3+ letters, so "the"/"is"/"of" don't dominate
+// the overlap score) for both the copy-paste guard and the keyword fallback.
+function significantWords(text) {
+  return (text || '').toLowerCase().match(/[a-z0-9]{3,}/g) || [];
+}
+
+// Deterministic, model-independent guard against the exploit where pasting
+// the question itself back as the answer scored full marks: an LLM grader
+// told to "give the benefit of the doubt" reliably falls for this, because
+// the question restates the exact vocabulary a correct answer would use.
+// This runs in plain JS before any LLM call, so it catches the exploit
+// identically in cloud mode and local mode — it doesn't depend on how well
+// either model follows instructions.
+function isRestatedQuestion(userText, questionText) {
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  const u = norm(userText), q = norm(questionText);
+  if (!u) return false;
+  if (u === q || q.includes(u) || u.includes(q)) return true;
+
+  const uWords = new Set(significantWords(userText));
+  const qWords = new Set(significantWords(questionText));
+  if (uWords.size === 0) return false;
+  const overlap = [...uWords].filter(w => qWords.has(w)).length;
+  const overlapRatio = overlap / uWords.size;
+  // High overlap AND roughly question-length — a genuine answer that reuses
+  // some question vocabulary while actually explaining something is
+  // reliably longer than the question itself, so this doesn't false-positive
+  // on real (if similarly-worded) answers.
+  const lengthRatio = uWords.size / Math.max(qWords.size, 1);
+  return overlapRatio > 0.8 && lengthRatio < 1.3;
+}
+
 function buildDescriptiveEvalPrompt(q, userText) {
   const docCtx = (window._quizDocText || '').slice(0, 5000);
-  return `You are a lenient and fair exam evaluator. Your goal is to reward understanding, not penalise imperfect wording.
+  return `Grade this exam answer. Be fair: reward correct understanding even with imperfect wording, spelling, or grammar — do not require exact phrases from the document.
 
-DOCUMENT CONTEXT: ${docCtx}
 QUESTION: ${q.q}
 MODEL ANSWER: ${q.answer}
 STUDENT ANSWER: ${userText}
 MAXIMUM MARKS: ${q.marks}
 
-EVALUATION GUIDELINES (be generous):
-- If the student clearly understands the concept, award FULL marks even if they didn't use exact words from the document
-- If the answer is partially correct or shows some understanding, award HALF marks
-- Only award 0 if the answer is completely wrong, irrelevant, or blank
-- Do NOT penalise for spelling mistakes, grammar, or informal language
-- Do NOT require the student to copy exact phrases from the document
-- A simple but correct explanation is worth full marks
-- Give benefit of the doubt — if it could be interpreted as correct, treat it as correct
+Scoring:
+- Full marks: the answer correctly explains the concept, in the student's own words
+- Half marks: partially correct, or correct but incomplete
+- Zero: wrong, irrelevant, blank, or the "answer" just repeats/rephrases the question back without actually answering it (this is not a real answer, no matter how closely it matches the document's vocabulary)
 
-Return ONLY this JSON (no markdown): {"earned": <number>, "feedback": "<one encouraging sentence of feedback>"}`;
+DOCUMENT CONTEXT (for your reference only, not something the student must quote): ${docCtx}
+
+Return ONLY this JSON (no markdown): {"earned": <number>, "feedback": "<one short sentence>"}`;
 }
 
 async function answerDescriptive() {
@@ -5679,29 +5708,46 @@ async function answerDescriptive() {
   quizAnswered = true;
   if (inp) inp.disabled = true;
 
+  let earned = 0;
+  let aiFeedback = '';
+
+  if (isRestatedQuestion(userText, q.q)) {
+    aiFeedback = "This just restates the question — it doesn't actually answer it.";
+    earned = 0;
+    quizScore += earned;
+    quizUserAnswers.push({ type:'descriptive', q:q.q, earned, marks:q.marks, userText, aiFeedback, difficulty:q.difficulty });
+    const nxt = document.getElementById('quiz-next');
+    if (nxt) nxt.style.display = 'inline-block';
+    return;
+  }
+
   // Show evaluating state on submit button
   const submitBtn = document.querySelector('[onclick="answerDescriptive()"]');
   if (submitBtn) { submitBtn.textContent = '⏳ AI evaluating your answer...'; submitBtn.disabled = true; }
 
-  let earned = 0;
-  let aiFeedback = '';
-
   try {
     const evalPrompt = buildDescriptiveEvalPrompt(q, userText);
     const raw = docChatLocalMode
-      ? await callLocalLLM('Exam Evaluator', 'You are a lenient and fair exam evaluator. Output only what is asked for, nothing else.', evalPrompt, 300, 8192)
+      ? await callLocalLLM('Exam Evaluator', 'You are a fair exam evaluator. Output only what is asked for, nothing else.', evalPrompt, 300, 8192)
       : await callGeminiAPI([{ text: evalPrompt }], 300, 0);
     const parsed = safeParseJSON(raw);
     const result = Array.isArray(parsed) ? parsed[0] : parsed;
     if (result && typeof result.earned !== 'undefined') {
       earned = Math.min(Math.max(parseFloat(result.earned) || 0, 0), q.marks);
       aiFeedback = result.feedback || '';
+    } else {
+      throw new Error('No usable evaluation returned');
     }
   } catch(e) {
-    const ul = userText.toLowerCase();
-    const matched = (q.key_points||[]).filter(kp => ul.includes(kp.toLowerCase().slice(0,10))).length;
-    earned = Math.round((matched / Math.max(q.key_points?.length||1,1)) * q.marks * 2) / 2;
-    aiFeedback = 'Scored by keyword matching (AI evaluation unavailable).';
+    // AI grading unavailable — estimate via word overlap against BOTH the
+    // model answer and key_points (previously only key_points, which is
+    // often sparse/missing, silently collapsing this fallback to ~0 even for
+    // correct answers).
+    const uWords = new Set(significantWords(userText));
+    const refWords = new Set([...significantWords(q.answer), ...significantWords((q.key_points||[]).join(' '))]);
+    const overlap = refWords.size > 0 ? [...refWords].filter(w => uWords.has(w)).length / refWords.size : 0;
+    earned = overlap > 0.6 ? q.marks : overlap > 0.3 ? q.marks / 2 : 0;
+    aiFeedback = 'Scored by keyword overlap (AI evaluation unavailable) — worth a manual double-check.';
   }
 
   earned = Math.round(earned * 2) / 2;
