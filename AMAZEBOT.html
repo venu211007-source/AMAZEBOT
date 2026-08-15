@@ -5966,7 +5966,7 @@ function exportChat() {
     '<div class="hdr">',
     '  <div class="hdr-title">🤖 AMAZEBOT<\/div>',
     '  <div class="hdr-sub">A Teenager Innovation · Tribute to Suman Dutta sir<\/div>',
-    '  <div class="hdr-sub">G Venugopalan · Mahalakshmi R · Ram Eswar · Selva Vignesh<\/div>',
+    '  <div class="hdr-sub">G Venugopalan · Selva Vignesh · Mahalakshmi R<\/div>',
     '  <div class="hdr-date">Exported: ' + new Date().toLocaleString() + '<\/div>',
     '<\/div>',
     chatHistory.map(h=>'<div class="msg ' + h.role + '"><div class="role">' + (h.role==='user'?'👤 You':'🤖 AMAZEBOT') + '<\/div><div class="txt">' + h.text.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '<\/div><\/div>').join(''),
