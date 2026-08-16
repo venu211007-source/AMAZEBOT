@@ -2862,7 +2862,9 @@ function deleteSession(id) {
   openHistory(); // refresh
 }
 
-function loadSession(session) {
+function loadSessionById(id) {
+  const session = getStoredSessions().find(s => s.id === id);
+  if (!session) return;
   closeModal();
   clearChat();
   chatHistory = session.messages.slice();
@@ -2891,7 +2893,7 @@ function openHistory() {
             <span>${s.date}</span>
             <span>${s.messages.length} messages</span>
           </div>
-          <button class="history-load-btn" onclick='loadSession(${JSON.stringify(s)})'>
+          <button class="history-load-btn" onclick="loadSessionById('${s.id}')">
             ↩ Load this chat
           </button>
         </div>`).join('');
