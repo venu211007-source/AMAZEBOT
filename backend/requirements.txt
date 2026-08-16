@@ -9,3 +9,8 @@ python-multipart
 # numpy is pinned indirectly by TTS's own dependency resolution.
 torch
 TTS
+
+# Molecule Discovery's local fallback (main.py's generate_local_candidates) —
+# builds real 3D structures on this machine when the external MD-by-AI
+# service is unreachable/erroring/returning no candidates.
+rdkit

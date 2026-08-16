@@ -6606,7 +6606,7 @@ function selectDiscoveryHistoryEntry(id) {
   document.getElementById('discover-input-text').value = entry.query;
   window._lastDiscovery = entry.candidates;
   const result = document.getElementById('discover-result');
-  result.innerHTML = renderDiscoveryResults(entry.candidates);
+  result.innerHTML = renderDiscoveryResults(entry.candidates, entry.liveServiceNote);
   result.className = 'design-result show';
   const chatBtn = document.getElementById('discover-chat-btn');
   if (chatBtn) chatBtn.style.display = entry.candidates.length ? 'inline-block' : 'none';
@@ -6693,10 +6693,10 @@ async function runDiscovery() {
     if (!res.ok || data.status === 'error') throw new Error(data.error || data.message || 'Discovery failed');
 
     window._lastDiscovery = data.candidates || [];
-    if (result) { result.innerHTML = renderDiscoveryResults(window._lastDiscovery); result.className = 'design-result show'; }
+    if (result) { result.innerHTML = renderDiscoveryResults(window._lastDiscovery, data.live_service_note); result.className = 'design-result show'; }
     if (chatBtn && window._lastDiscovery.length) chatBtn.style.display = 'inline-block';
 
-    discoveryHistory.push({ id: 'd_' + Date.now(), query: input, params, candidates: window._lastDiscovery, createdAt: Date.now() });
+    discoveryHistory.push({ id: 'd_' + Date.now(), query: input, params, candidates: window._lastDiscovery, liveServiceNote: data.live_service_note, createdAt: Date.now() });
     saveDiscoveryHistory();
     renderDiscoveryHistoryList();
 
@@ -6707,7 +6707,7 @@ async function runDiscovery() {
   }
 }
 
-function renderDiscoveryResults(candidates) {
+function renderDiscoveryResults(candidates, liveServiceNote) {
   if (!candidates.length) return '<p style="color:var(--text-muted)">No candidates found.</p>';
   molOpenIndex = null; // fresh result set — any previously open 3D view no longer applies
   const cards = candidates.map((c, i) => {
@@ -6724,6 +6724,7 @@ function renderDiscoveryResults(candidates) {
         <div>Toxicity (target): <b>${c.tox_prob}</b></div>
       </div>
       ${isFallback ? `<div class="discovery-fallback-badge">🧩 Generic building block — a fallback filler molecule, not optimized for your request</div>` : ''}
+      ${c.is_local_fallback ? `<div class="discovery-fallback-badge">🖥️ Generated locally, not by the live AI model — see note above</div>` : ''}
       ${c.sdf ? `
       <button class="hl-action-btn" style="width:100%;justify-content:center;margin-top:10px;" onclick="toggleMolecule3D(${i})" id="mol3d-btn-${i}">🧬 View 3D Structure</button>
       <div class="mol3d-wrap" id="mol3d-wrap-${i}" style="display:none;">
@@ -6737,7 +6738,8 @@ function renderDiscoveryResults(candidates) {
   `;
   }).join('');
   const caveat = `<div style="font-size:11px;color:var(--accent-gold);background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.25);border-radius:8px;padding:8px 10px;margin-bottom:10px;">⚠️ Gap/solubility/toxicity above are the <b>targets you asked for</b>, echoed back — not independently verified predictions for these specific molecules. Fitness is currently a placeholder score. Treat these as generated candidates to review, not confirmed measurements.</div>`;
-  return caveat + cards;
+  const liveNote = liveServiceNote ? `<div style="font-size:12px;color:#ff8080;background:rgba(224,32,32,0.08);border:1px solid rgba(224,32,32,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;">⚠️ ${escapeHtml(liveServiceNote)}</div>` : '';
+  return liveNote + caveat + cards;
 }
 
 function sendDiscoveryToChat() {
