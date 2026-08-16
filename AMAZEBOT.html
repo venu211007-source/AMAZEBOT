@@ -2751,7 +2751,12 @@ async function callGeminiAPI(parts, maxTokens = 4000, temperature = 0.3) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature }
+          // thinkingBudget:0 disables the 2.5 models' default "thinking" pass —
+          // without this, a tight maxOutputTokens (used for short structured
+          // outputs like JSON extraction) can get entirely consumed by internal
+          // reasoning tokens before any visible answer text is produced, which
+          // reads as a silent empty response rather than an error.
+          generationConfig: { maxOutputTokens: maxTokens, temperature, thinkingConfig: { thinkingBudget: 0 } }
         })
       });
       const data = await res.json();
@@ -2780,6 +2785,12 @@ async function callGeminiAPI(parts, maxTokens = 4000, temperature = 0.3) {
         continue;
       }
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // An empty response is treated as this model's failure, not a valid
+      // (if unhelpful) answer — silently accepting it here is exactly what
+      // let a thinking-budget-exhausted response masquerade as success and
+      // surface downstream as "could not understand that request" instead
+      // of retrying the next model in the list.
+      if (!text) { lastError = `${model} returned an empty response`; continue; }
       return text;
     } catch(e) {
       if (e.message.includes('Invalid API key')) throw e;
