@@ -1002,7 +1002,7 @@
   .api-note span { color: #ff6060; }
 
   .api-key-badge {
-    display: flex;
+    display: none;
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
@@ -2543,6 +2543,8 @@ function saveApiKey() {
     document.getElementById('api-overlay').classList.add('hidden');
     const preview = document.getElementById('api-key-preview');
     if (preview) preview.textContent = key.slice(0, 8) + '...' + key.slice(-4);
+    const badge = document.getElementById('api-key-badge');
+    if (badge) badge.classList.add('show');
   } catch(e) {
     alert('Error saving key: ' + e.message);
   }
