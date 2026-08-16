@@ -10,6 +10,9 @@
 <script src="lib/marked.min.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/pdf.min.js"></script>
+<link rel="stylesheet" href="lib/katex/katex.min.css">
+<script src="lib/katex/katex.min.js"></script>
+<script src="lib/katex/auto-render.min.js"></script>
 <style>
   :root {
     --bg-deep: #080808;
@@ -2057,11 +2060,11 @@
           </div>
         </div>
       </div>
-      <div class="api-key-badge" id="api-key-badge" onclick="changeApiKey()" title="Click to change API key">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        <span id="api-key-preview">sk-ant-...</span>
-        · change
-      </div>
+      <!-- API key badge intentionally removed from the header — showing even a
+           partial key on screen isn't appropriate for a presentation. The key
+           can still be changed via the "Click to update it" link that appears
+           if a request ever fails with an invalid-key error (see changeApiKey()). -->
+      <span id="api-key-preview" style="display:none;"></span>
     </div>
   </header>
 
@@ -3859,6 +3862,27 @@ function getTimestamp() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Renders LaTeX math (e.g. $\beta_{k+1}$ or $$...$$ block equations) inside
+// already-markdown-rendered HTML. Markdown itself has no concept of math
+// notation, so without this, formulas the model writes in LaTeX show up as
+// raw, unrendered source text. Runs after marked.parse() on purpose —
+// markdown doesn't treat $, \, or {} specially, so it passes typical LaTeX
+// through unchanged for KaTeX to then find and render.
+function renderMathIn(el) {
+  if (!window.renderMathInElement) return;
+  try {
+    renderMathInElement(el, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '\\[', right: '\\]', display: true },
+        { left: '$', right: '$', display: false },
+        { left: '\\(', right: '\\)', display: false }
+      ],
+      throwOnError: false
+    });
+  } catch (e) { console.warn('Math rendering failed:', e.message); }
+}
+
 function appendMessage(role, content, extras = {}, containerId = 'chat-messages', welcomeId = 'welcome-screen') {
   const welcome = document.getElementById(welcomeId);
   if (welcome) welcome.remove();
@@ -3879,6 +3903,7 @@ function appendMessage(role, content, extras = {}, containerId = 'chat-messages'
 
   if (role === 'ai') {
     bubbleDiv.innerHTML = marked.parse(content || '');
+    renderMathIn(bubbleDiv);
     if (extras.chartData) renderChart(bubbleDiv, extras.chartData);
     if (extras.imagePrompt) renderGeneratedImage(bubbleDiv, extras.imagePrompt);
     // Add copy buttons to all code blocks
@@ -4214,7 +4239,7 @@ async function sendMessage() {
     }
 
     // ── ONLINE MODE — call Gemini ─────────────────────────────────────────
-    const parts = buildGeminiParts(query, responseType);
+    const parts = await buildGeminiParts(query, responseType);
     const rawText = await callGeminiAPI(parts, 4000, 0.7);
     displayText = rawText;
 
@@ -4415,7 +4440,22 @@ detailed vivid image description here
   return base + responseRules + '\n\n' + (extra[responseType] || extra.auto);
 }
 
-function buildGeminiParts(query, responseType) {
+// Office Open XML files (.pptx/.docx/.xlsx) are NOT among the file types
+// Gemini's API can read natively (that list is really just PDF, images,
+// audio, video, and plain text) — sending one as inline_data gets rejected
+// with an "Unsupported MIME type" error, which callGeminiAPI silently
+// recovers from by dropping the file and answering with no document at all.
+// So for these three types we extract real text client-side first (via
+// JSZip — the same working path Quiz already used) and send that as text
+// instead of ever attempting inline_data for them.
+async function officeDocPart(doc, label) {
+  const text = await extractOfficeText(doc.content?.base64 || doc.base64 || '', doc.type);
+  return { text: text
+    ? `(${label} — a ${doc.type.toUpperCase()} file, extracted below)\n${text}`
+    : `(${label} — a ${doc.type.toUpperCase()} file, but no readable text could be extracted from it)` };
+}
+
+async function buildGeminiParts(query, responseType) {
   const parts = [];
 
   // System prompt
@@ -4424,7 +4464,8 @@ function buildGeminiParts(query, responseType) {
   if (documentContent.type === 'multi') {
     const docs = documentContent.docs;
     parts.push({ text: `The user has loaded ${docs.length} documents. Analyze ALL of them.\n\n` });
-    docs.forEach((doc, i) => {
+    for (let i = 0; i < docs.length; i++) {
+      const doc = docs[i];
       parts.push({ text: `\n=== DOCUMENT ${i+1}: ${doc.name} ===\n` });
       if (doc.type === 'text') {
         parts.push({ text: (doc.content?.content || '').slice(0, 20000) });
@@ -4432,16 +4473,14 @@ function buildGeminiParts(query, responseType) {
         parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.content.base64 } });
         parts.push({ text: `(Above is Document ${i+1}: ${doc.name} — a PDF)` });
       } else if (['pptx','docx','xlsx'].includes(doc.type)) {
-        const mimemap = {pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
-        parts.push({ inline_data: { mime_type: mimemap[doc.type], data: doc.content.base64 } });
-        parts.push({ text: `(Above is Document ${i+1}: ${doc.name} — a ${doc.type.toUpperCase()} file. Read ALL slides/pages/sheets.)` });
+        parts.push(await officeDocPart(doc, `Document ${i+1}: ${doc.name}`));
       } else if (doc.type === 'image') {
         parts.push({ inline_data: { mime_type: doc.content.mimeType, data: doc.content.base64 } });
         parts.push({ text: `(Above is Document ${i+1}: ${doc.name} — an image)` });
       } else if (doc.type === 'stl') {
         parts.push({ text: buildSTLAnalysisText(doc.content.stlData) });
       }
-    });
+    }
   } else if (documentContent.type === 'stl') {
     parts.push({ text: buildSTLAnalysisText(documentContent.stlData) });
   } else if (documentContent.type === 'image') {
@@ -4451,9 +4490,7 @@ function buildGeminiParts(query, responseType) {
     parts.push({ inline_data: { mime_type: 'application/pdf', data: documentContent.base64 } });
     parts.push({ text: 'This is the PDF document the user uploaded. Analyze it carefully.' });
   } else if (['pptx','docx','xlsx'].includes(documentContent.type)) {
-    const mimemap = {pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
-    parts.push({ inline_data: { mime_type: mimemap[documentContent.type], data: documentContent.base64 } });
-    parts.push({ text: `This is the ${documentContent.type.toUpperCase()} file the user uploaded. Read through ALL slides/pages/sheets carefully and answer questions based on the full content.` });
+    parts.push(await officeDocPart(documentContent, 'The uploaded file'));
   } else {
     // documentContent is {type:'text', content:'...'} — the actual text is at .content
     const truncated = (documentContent.content || '').slice(0, 50000);
@@ -5354,7 +5391,10 @@ async function generateFlashcards() {
 
   showModal('flashcard-modal', `<div class="feature-loading"><div class="processing-bar" style="width:200px"></div><div>Generating flashcards...</div></div>`);
   try {
-    const docText = extractDocText();
+    let docText = extractDocText();
+    if (!docText.trim() && documentContent && ['pptx','docx','xlsx'].includes(documentContent.type)) {
+      docText = await extractOfficeText(documentContent.base64, documentContent.type);
+    }
     if (!docText.trim()) { closeModal(); showError('No readable text found in the document.'); return; }
 
     const prompt = `Based on this document, generate exactly 8 flashcards for studying.
@@ -6464,7 +6504,7 @@ Be specific, technical, and practical. Use real engineering values, formulas, an
     const text = docChatLocalMode
       ? await callLocalLLM('Design Engineer', 'You are a helpful, precise engineering assistant. Output only what is asked for, nothing else.', prompt, 3000, 8192)
       : await callGeminiAPI([{ text: prompt }], 4000, 0.6);
-    if (result) { result.innerHTML = marked.parse(text); result.className = 'design-result show'; }
+    if (result) { result.innerHTML = marked.parse(text); renderMathIn(result); result.className = 'design-result show'; }
     if (copyBtn) copyBtn.style.display = 'inline-block';
     if (chatBtn) chatBtn.style.display = 'inline-block';
 
@@ -6508,7 +6548,7 @@ Make ideas diverse — from simple/cheap to advanced/complex.`;
     const text = docChatLocalMode
       ? await callLocalLLM('Design Engineer', 'You are a helpful, creative engineering assistant. Output only what is asked for, nothing else.', prompt, 2000, 8192)
       : await callGeminiAPI([{ text: prompt }], 2000, 0.8);
-    if (result) { result.innerHTML = marked.parse(text); result.className = 'design-result show'; }
+    if (result) { result.innerHTML = marked.parse(text); renderMathIn(result); result.className = 'design-result show'; }
     window._lastDesign = text;
     const copyBtn = document.getElementById('design-copy-btn');
     const chatBtn = document.getElementById('design-chat-btn');
