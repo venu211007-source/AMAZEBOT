@@ -2,13 +2,40 @@
 
 **An AI-Powered Document, Character-Voice & Molecule Discovery Assistant**
 
-**Course:** Introduction to Material Informatics
-**Institution:** Amrita Vishwa Vidyapeetham
+A Project Report submitted in partial fulfilment of the requirements for **B.Tech in Artificial Intelligence and Data Science**, course **Introduction to Material Informatics (23MAT204)**, Amrita Vishwa Vidyapeetham.
 
-**Team:**
+**Submitted by:**
 - G Venugopalan — CB.AI.U4AID25115
 - Selva Vignesh — CB.AI.U4AID25149
 - Mahalakshmi R — CB.AI.U4AID25167
+
+**Under the guidance of:** Dr. Suman Dutta
+**Head of the Department:** Dr. Soman K P
+
+> A formatted, print-ready version of this report — including the Certificate and Declaration pages with signature blocks — is available as [`AmazeBot_Project_Report.pdf`](AmazeBot_Project_Report.pdf) in this repository.
+
+---
+
+## Certificate
+
+This is to certify that the project report entitled *"AmazeBot: An AI-Powered Document, Character-Voice & Molecule Discovery Assistant"* is a bonafide record of the work carried out by G Venugopalan (CB.AI.U4AID25115), Selva Vignesh (CB.AI.U4AID25149), and Mahalakshmi R (CB.AI.U4AID25167), in partial fulfilment of the requirements for the course Introduction to Material Informatics (23MAT204), B.Tech in Artificial Intelligence and Data Science, Amrita Vishwa Vidyapeetham, during the academic year 2026, under the supervision of the undersigned.
+
+| | |
+|---|---|
+| **Dr. Suman Dutta** | **Dr. Soman K P** |
+| Faculty Guide, Course Faculty — Introduction to Material Informatics | Head of the Department, Department of Artificial Intelligence |
+
+*(Signed copies appear on the PDF version.)*
+
+## Declaration
+
+We hereby declare that the project report entitled *"AmazeBot: An AI-Powered Document, Character-Voice & Molecule Discovery Assistant"*, submitted for the course Introduction to Material Informatics (23MAT204), B.Tech in Artificial Intelligence and Data Science, Amrita Vishwa Vidyapeetham, is a record of original work carried out by us under the guidance of Dr. Suman Dutta, and has not been submitted elsewhere for the award of any degree, diploma, or other similar title.
+
+- G Venugopalan — CB.AI.U4AID25115
+- Selva Vignesh — CB.AI.U4AID25149
+- Mahalakshmi R — CB.AI.U4AID25167
+
+*(Signed copies appear on the PDF version.)*
 
 ---
 
